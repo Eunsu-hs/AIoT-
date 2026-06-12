@@ -1,0 +1,114 @@
+import time                         # 시간 지연 및 시간 측정을 위한 모듈 불러오기
+import RPi.GPIO as GPIO             # 라즈베리 파이 GPIO 핀 제어 모듈 불러오기
+from gpiozero import LED            # LED 제어를 위한 gpiozero 라이브러리 불러오기
+
+
+# HC-SR04 초음파 센서 핀 설정
+TRIG = 23                           # 초음파 발생 신호를 보내는 Trigger 핀 설정 (GPIO 23)
+ECHO = 24                           # 반사된 초음파 신호를 받는 Echo 핀 설정 (GPIO 24)
+
+
+# LED 핀 설정
+led = LED(17)                       # GPIO 17번 핀에 연결된 LED 객체 생성
+
+
+# GPIO 핀 번호를 BCM 방식으로 사용하도록 설정
+GPIO.setmode(GPIO.BCM)
+
+# Trigger 핀은 출력(Output)으로 설정
+GPIO.setup(TRIG, GPIO.OUT)
+
+# Echo 핀은 입력(Input)으로 설정
+GPIO.setup(ECHO, GPIO.IN)
+
+
+
+# 초음파 센서를 이용하여 거리를 측정하는 함수
+def get_distance():
+
+    # Trigger 핀에 짧은 HIGH 신호를 보내 초음파 발생
+    GPIO.output(TRIG, True)
+    time.sleep(0.00001)             # 10μs 동안 HIGH 유지
+    GPIO.output(TRIG, False)        # Trigger 신호 종료
+
+
+    # 초음파가 발사된 시간과 돌아온 시간을 저장할 변수 생성
+    start_time = time.time()
+    stop_time = time.time()
+
+
+    # Echo 신호가 HIGH가 될 때까지 대기
+    # 초음파가 물체에 도달하기 전까지의 시간 측정
+    while GPIO.input(ECHO) == 0:
+        start_time = time.time()
+
+
+    # Echo 신호가 LOW로 변경될 때까지 대기
+    # 초음파가 반사되어 돌아오는 시간 측정
+    while GPIO.input(ECHO) == 1:
+        stop_time = time.time()
+
+
+    # 초음파 왕복 시간 계산
+    elapsed_time = stop_time - start_time
+
+
+    # 거리 계산
+    # 거리 = 시간 × 음속(34300cm/s) ÷ 2 (왕복 거리 보정)
+    distance = (elapsed_time * 34300) / 2
+
+
+    # 계산된 거리 반환
+    return distance
+
+
+
+try:
+
+    # 프로그램 종료 전까지 계속 실행
+    while True:
+
+        # 초음파 센서로 거리 측정
+        distance = get_distance()
+
+
+        # 현재 측정된 거리 출력
+        print("측정 거리 : %.2f cm" % distance)
+
+
+        # 물체가 20cm 이내로 접근한 경우
+        if distance < 20:
+
+            # LED 켜기
+            led.on()
+
+            # 접근 감지 메시지 출력
+            print("접근 감지 - LED ON")
+
+
+        # 물체가 20cm보다 멀리 있는 경우
+        else:
+
+            # LED 끄기
+            led.off()
+
+            # 안전 거리 메시지 출력
+            print("안전 거리 - LED OFF")
+
+
+        # 0.5초마다 거리 측정 반복
+        time.sleep(0.5)
+
+
+
+# Ctrl + C 입력 시 프로그램 종료
+except KeyboardInterrupt:
+
+    print("프로그램 종료")
+
+
+
+# 프로그램 종료 후 GPIO 초기화
+finally:
+
+    GPIO.cleanup()
